@@ -12,7 +12,7 @@ class Devspace < Formula
   conflicts_with "homebrew/core/devspace"
 
   bottle do
-    url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles/devspace-6.1.1.arm64_ventura.bottle.tar.gz"
+    root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
     sha256 "c2cf0312d31db50d2c74d02c63e69f6b2dc844815e0de1d52a6e83d852ab9bee"
   end
 

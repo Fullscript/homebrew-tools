@@ -13,7 +13,7 @@ class Vcluster < Formula
   conflicts_with "homebrew/core/vcluster"
 
   bottle do
-    url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles/vcluster-0.12.3.arm64_ventura.bottle.tar.gz"
+    root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
     sha256 "d9a42c632c6165da6f686f240857f62727135d05b42e5b2092e8d5e621d46b08"
   end
 
