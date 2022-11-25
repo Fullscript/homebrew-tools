@@ -13,7 +13,7 @@ class Devspace < Formula
 
   bottle do
     root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
-    sha256 "c2cf0312d31db50d2c74d02c63e69f6b2dc844815e0de1d52a6e83d852ab9bee"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "c2cf0312d31db50d2c74d02c63e69f6b2dc844815e0de1d52a6e83d852ab9bee"
   end
 
   def install
