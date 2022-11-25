@@ -13,9 +13,8 @@ class Vcluster < Formula
   conflicts_with "homebrew/core/vcluster"
 
   bottle do
-    rebuild 1
     root_url "https://github.com/Fullscript/homebrew-tools/releases/tag/bottles"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "94ee93153d5a497d627ac6f273e80b9d91862feae0c205e70b265a7d0570c804"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "d9a42c632c6165da6f686f240857f62727135d05b42e5b2092e8d5e621d46b08"
   end
 
   def install
