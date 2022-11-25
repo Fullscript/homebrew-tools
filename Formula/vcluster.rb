@@ -15,7 +15,7 @@ class Vcluster < Formula
   bottle do
     rebuild 1
     root_url "https://github.com/Fullscript/homebrew-tools/releases/tag/bottles"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "7a4ff601d0e01d497b89e71caec718a1f6be880a1258b84eac4cc8dfc99a16eb"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "94ee93153d5a497d627ac6f273e80b9d91862feae0c205e70b265a7d0570c804"
   end
 
   def install
