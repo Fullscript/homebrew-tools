@@ -9,6 +9,7 @@ class Sops < Formula
   bottle do
     root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
     sha256 cellar: :any_skip_relocation, arm64_ventura: "edadfb5e554fabf348be101e39cc32dbf3a9bf831ebeb27da340bd2d375765c3"
+    sha256 cellar: :any_skip_relocation, ventura: "fcda5c3b48a043db32e49b84b29081e0904879ef54dae2b206e13ba9813306a5"
   end
 
   depends_on "go" => :build
