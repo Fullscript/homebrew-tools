@@ -2,8 +2,8 @@ class Devspace < Formula
   desc "CLI helps develop/deploy/debug apps with Docker and k8s"
   homepage "https://devspace.sh/"
   url "https://github.com/loft-sh/devspace.git",
-      tag:      "v6.1.1",
-      revision: "9cd3723afbf14d488a208b0dfb301f9670a51c92"
+      tag:      "v6.2.5",
+      revision: "f26b041dece7f11b247cb323a264e726aef1f2c6"
   license "Apache-2.0"
 
   depends_on "go" => :build
@@ -13,8 +13,7 @@ class Devspace < Formula
 
   bottle do
     root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "c2cf0312d31db50d2c74d02c63e69f6b2dc844815e0de1d52a6e83d852ab9bee"
-    sha256 cellar: :any_skip_relocation, ventura: "32928130ae5c44d0c146b73cb45819b6c660d47256d177bb08e30d35131b5fc6"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "531d808cc7c6bbc48db2a8df12fadc1560c6078bbf3c6e2676a7bdef6c11cfc3"
   end
 
   def install
