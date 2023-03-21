@@ -2,8 +2,8 @@ class Vcluster < Formula
   desc "Creates fully functional virtual k8s cluster inside host k8s cluster's namespace"
   homepage "https://www.vcluster.com"
   url "https://github.com/loft-sh/vcluster.git",
-      tag:      "v0.12.3",
-      revision: "397d9942f6f05ba7ca1dc9d507f26c8e33cd36b4"
+      tag:      "v0.14.2",
+      revision: "0dac15bff8ee6b4048b1f2c44a97eb95820d3ec2"
   license "Apache-2.0"
 
   depends_on "go" => :build
@@ -14,8 +14,7 @@ class Vcluster < Formula
 
   bottle do
     root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "d9a42c632c6165da6f686f240857f62727135d05b42e5b2092e8d5e621d46b08"
-    sha256 cellar: :any_skip_relocation, ventura: "32fed9a933c432269dea988b89a0900d089e5d72baa0c64f7dd67e158108ec3d"
+    sha256 cellar: :any_skip_relocation, arm64_ventura: "72468f665b007d39c6d040ecfb44c2c500dc0b249f8dee8e51ace1fb1aad3f91"
   end
 
   def install
@@ -25,6 +24,7 @@ class Vcluster < Formula
       -X main.buildDate=#{time.iso8601}
       -X main.version=#{version}
     ]
+    system "go", "generate", "./..."
     system "go", "build", "-mod", "vendor", *std_go_args(ldflags: ldflags), "./cmd/vclusterctl/main.go"
   end
 
