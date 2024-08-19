@@ -2,9 +2,10 @@ class Vcluster < Formula
   desc "Creates fully functional virtual k8s cluster inside host k8s cluster's namespace"
   homepage "https://www.vcluster.com"
   url "https://github.com/loft-sh/vcluster.git",
-      tag:      "v0.14.2",
-      revision: "0dac15bff8ee6b4048b1f2c44a97eb95820d3ec2"
+      tag:      "v0.19.7",
+      revision: "75c742cf1bbca367394ee04e3ee9f9664ae0bc56"
   license "Apache-2.0"
+  head "https://github.com/loft-sh/vcluster.git", branch: "main"
 
   depends_on "go" => :build
   depends_on "helm"
@@ -14,8 +15,7 @@ class Vcluster < Formula
 
   bottle do
     root_url "https://github.com/Fullscript/homebrew-tools/releases/download/bottles"
-    sha256 cellar: :any_skip_relocation, arm64_ventura: "72468f665b007d39c6d040ecfb44c2c500dc0b249f8dee8e51ace1fb1aad3f91"
-    sha256 cellar: :any_skip_relocation, ventura: "5ae199dba373d25b2b3d0420af2ea5884b9df33f1f8175719d2ef46d4009df97"
+    sha256 cellar: :any_skip_relocation, arm64_sonoma: "63b9771c605e21ddcad311ebf5f56d1232b729f64cd83a19e926c5e76a3c2883"
   end
 
   def install
@@ -26,7 +26,8 @@ class Vcluster < Formula
       -X main.version=#{version}
     ]
     system "go", "generate", "./..."
-    system "go", "build", "-mod", "vendor", *std_go_args(ldflags: ldflags), "./cmd/vclusterctl/main.go"
+    system "go", "build", "-mod", "vendor", *std_go_args(ldflags:), "./cmd/vclusterctl/main.go"
+    generate_completions_from_executable(bin/"vcluster", "completion")
   end
 
   test do
@@ -38,6 +39,6 @@ class Vcluster < Formula
                     "try setting KUBERNETES_MASTER environment variable), " \
                     "please make sure you have access to a kubernetes cluster and the command " \
                     "`kubectl get namespaces` is working"
-    assert_match create_output, shell_output("#{bin}/vcluster create vcluster -n vcluster --create-namespace", 1)
+    assert_match create_output, shell_output("#{bin}/vcluster create vcluster -n vcluster --create-namespace 2>&1", 1)
   end
 end
