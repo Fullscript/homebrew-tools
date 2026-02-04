@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require 'json'
 require 'open3'
 
 class FullscriptClaudeCode
@@ -59,13 +60,14 @@ class FullscriptClaudeCode
 
   def gitlab_email
     @gitlab_email ||= begin
-      stdout, stderr, status = Open3.capture3(RX_BIN, "config", "auth", "--type", "gitlab", "--show")
+      stdout, stderr, status = Open3.capture3(RX_BIN, "config", "auth", "--json", "--type", "gitlab")
       raise "Failed to get GitLab config from rx: #{stderr}" unless status.success?
 
-      email_line = stdout.lines.find { |l| l.include?("GitLab email:") }
-      raise "Could not determine GitLab email from rx config" unless email_line
+      data = JSON.parse(stdout)
+      email = data.dig("gitlab", "email")
+      raise "Could not determine GitLab email from rx config" unless email
 
-      email_line.split("GitLab email:").last.strip
+      email
     end
   end
 
