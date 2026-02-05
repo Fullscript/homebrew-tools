@@ -4,9 +4,8 @@ require 'open3'
 
 class FullscriptClaudeCode
   REGION = "us-east-1"
-  SYSTEM_CLAUDE_DIR = "/Library/Application Support/ClaudeCode"
   ENV_CONFIG_FILE = "#{HOMEBREW_PREFIX}/etc/fullscript-claude-code/env.sh"
-  SYSTEM_SETTINGS_FILE = "#{SYSTEM_CLAUDE_DIR}/managed-settings.json"
+  USER_SETTINGS_FILE = File.expand_path("~/.claude/settings.json")
   RX_BIN = "/opt/fullscript/bin/rx"
   AWS_BIN = "#{HOMEBREW_PREFIX}/bin/aws"
   MIN_AWS_VERSION = "2.27.63"
@@ -30,7 +29,7 @@ class FullscriptClaudeCode
     ensure_aws_authenticated
     create_all_inference_profiles
     install_claude_code_env_config
-    install_system_settings
+    install_user_settings
   end
 
   private
@@ -196,34 +195,40 @@ class FullscriptClaudeCode
     SHELL
   end
 
-  def install_system_settings
-    expected_content = JSON.pretty_generate(default_settings)
+  def install_user_settings
+    FileUtils.mkdir_p(File.dirname(USER_SETTINGS_FILE))
 
-    if File.exist?(SYSTEM_SETTINGS_FILE) && File.read(SYSTEM_SETTINGS_FILE) == expected_content
-      ohai "#{SYSTEM_SETTINGS_FILE} already up to date"
+    existing_content = read_settings_file
+    settings = begin
+      JSON.parse(existing_content)
+    rescue JSON::ParserError => e
+      raise "Cannot update #{USER_SETTINGS_FILE}: file contains invalid JSON (#{e.message}). Please fix or remove it and try again."
+    end
+
+    apply_default_settings(settings)
+    new_content = JSON.pretty_generate(settings)
+
+    if existing_content == new_content
+      ohai "#{USER_SETTINGS_FILE} already up to date"
       return
     end
 
-    sudo_prompt = "Password required to write #{SYSTEM_SETTINGS_FILE}: "
-
-    unless Dir.exist?(SYSTEM_CLAUDE_DIR)
-      _, stderr, status = Open3.capture3("sudo", "-p", sudo_prompt, "mkdir", "-p", SYSTEM_CLAUDE_DIR)
-      raise "Failed to create #{SYSTEM_CLAUDE_DIR}: #{stderr}" unless status.success?
-    end
-
-    _, stderr, status = Open3.capture3("sudo", "-p", sudo_prompt, "tee", SYSTEM_SETTINGS_FILE, stdin_data: expected_content)
-    raise "Failed to write #{SYSTEM_SETTINGS_FILE}: #{stderr}" unless status.success?
-
-    ohai "Created #{SYSTEM_SETTINGS_FILE}"
+    File.write(USER_SETTINGS_FILE, new_content)
+    ohai "Updated #{USER_SETTINGS_FILE}"
   end
 
-  def default_settings
-    {
-      "awsAuthRefresh" => "#{RX_BIN} sso login",
-      "permissions" => {
-        "allow" => default_permissions,
-      },
-    }
+  def read_settings_file
+    File.read(USER_SETTINGS_FILE)
+  rescue Errno::ENOENT
+    "{}"
+  end
+
+  def apply_default_settings(settings)
+    settings["awsAuthRefresh"] = "#{RX_BIN} sso login"
+
+    settings["permissions"] ||= {}
+    settings["permissions"]["allow"] ||= []
+    settings["permissions"]["allow"] |= default_permissions
   end
 
   def default_permissions
@@ -290,7 +295,7 @@ cask "fullscript-claude-code" do
 
     Configuration files created:
     - #{FullscriptClaudeCode::ENV_CONFIG_FILE} (Bedrock environment variables)
-    - #{FullscriptClaudeCode::SYSTEM_SETTINGS_FILE} (system-level settings)
+    - #{FullscriptClaudeCode::USER_SETTINGS_FILE} (user settings)
 
     If you need to re-authenticate with AWS, run:
       #{FullscriptClaudeCode::RX_BIN} sso login
@@ -298,10 +303,5 @@ cask "fullscript-claude-code" do
 
   uninstall_postflight do
     FileUtils.rm(FullscriptClaudeCode::ENV_CONFIG_FILE) if File.exist?(FullscriptClaudeCode::ENV_CONFIG_FILE)
-
-    if File.exist?(FullscriptClaudeCode::SYSTEM_SETTINGS_FILE)
-      sudo_prompt = "Password required to remove #{FullscriptClaudeCode::SYSTEM_SETTINGS_FILE}: "
-      Open3.capture3("sudo", "-p", sudo_prompt, "rm", FullscriptClaudeCode::SYSTEM_SETTINGS_FILE)
-    end
   end
 end
