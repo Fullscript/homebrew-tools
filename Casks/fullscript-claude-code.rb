@@ -11,7 +11,7 @@ class FullscriptClaudeCode
   MIN_AWS_VERSION = "2.27.63"
   INFERENCE_PROFILES = {
     "opus-4-6" => "global.anthropic.claude-opus-4-6-v1",
-    "sonnet-4-5" => "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "sonnet-4-6" => "global.anthropic.claude-sonnet-4-6",
     "haiku-4-5" => "global.anthropic.claude-haiku-4-5-20251001-v1:0",
   }.freeze
 
@@ -186,7 +186,7 @@ class FullscriptClaudeCode
 
       # Default model aliases (maps opus/sonnet/haiku commands to inference profiles)
       export ANTHROPIC_DEFAULT_OPUS_MODEL="#{arns["opus-4-6"]}"
-      export ANTHROPIC_DEFAULT_SONNET_MODEL="#{arns["sonnet-4-5"]}"
+      export ANTHROPIC_DEFAULT_SONNET_MODEL="#{arns["sonnet-4-6"]}"
       export ANTHROPIC_DEFAULT_HAIKU_MODEL="#{arns["haiku-4-5"]}"
 
       # Recommended output token settings for Bedrock
@@ -268,7 +268,7 @@ class FullscriptClaudeCode
 end
 
 cask "fullscript-claude-code" do
-  version "1.0.0"
+  version "1.1.0"
   sha256 :no_check
 
   url "file:///dev/null"
