@@ -27,6 +27,7 @@ class FullscriptClaudeCode
     check_rx_installed
     check_aws_version
     ensure_aws_authenticated
+    cleanup_stale_inference_profiles
     create_all_inference_profiles
     install_claude_code_env_config
     install_user_settings
@@ -139,6 +140,32 @@ class FullscriptClaudeCode
 
   def create_all_inference_profiles
     INFERENCE_PROFILES.each { |suffix, model_id| create_inference_profile(suffix, model_id) }
+  end
+
+  def cleanup_stale_inference_profiles
+    stdout, stderr, status = Open3.capture3(
+      AWS_BIN, "bedrock", "list-inference-profiles",
+      "--region", REGION,
+      "--type", "APPLICATION",
+      "--query", "inferenceProfileSummaries[?starts_with(inferenceProfileName, '#{username_slug}-')].[inferenceProfileName,inferenceProfileArn]",
+      "--output", "text"
+    )
+    raise "Failed to list inference profiles: #{stderr}" unless status.success?
+
+    expected_names = INFERENCE_PROFILES.keys.map { |suffix| "#{username_slug}-#{suffix}-claude-code" }
+
+    stdout.lines.each do |line|
+      name, arn = line.strip.split("\t")
+      next if expected_names.include?(name)
+
+      ohai "Deleting stale inference profile: #{name}"
+      _, del_stderr, del_status = Open3.capture3(
+        AWS_BIN, "bedrock", "delete-inference-profile",
+        "--inference-profile-identifier", arn,
+        "--region", REGION
+      )
+      raise "Failed to delete inference profile #{name}: #{del_stderr}" unless del_status.success?
+    end
   end
 
   def get_inference_profile_arns
@@ -268,7 +295,7 @@ class FullscriptClaudeCode
 end
 
 cask "fullscript-claude-code" do
-  version "1.1.0"
+  version "1.1.1"
   sha256 :no_check
 
   url "file:///dev/null"
