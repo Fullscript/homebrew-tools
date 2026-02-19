@@ -147,7 +147,7 @@ class FullscriptClaudeCode
       AWS_BIN, "bedrock", "list-inference-profiles",
       "--region", REGION,
       "--type", "APPLICATION",
-      "--query", "inferenceProfileSummaries[?starts_with(inferenceProfileName, '#{username_slug}-') && contains(inferenceProfileName, '-claude-code')].[inferenceProfileName,inferenceProfileArn]",
+      "--query", "inferenceProfileSummaries[?starts_with(inferenceProfileName, '#{username_slug}-')].[inferenceProfileName,inferenceProfileArn]",
       "--output", "text"
     )
     raise "Failed to list inference profiles: #{stderr}" unless status.success?
