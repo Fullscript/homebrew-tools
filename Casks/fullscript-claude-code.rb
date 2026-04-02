@@ -251,6 +251,7 @@ class FullscriptClaudeCode
   end
 
   def apply_default_settings(settings)
+    settings["autoUpdatesChannel"] ||= "stable"
     settings["awsAuthRefresh"] = "#{RX_BIN} sso login"
 
     settings["permissions"] ||= {}
@@ -295,7 +296,7 @@ class FullscriptClaudeCode
 end
 
 cask "fullscript-claude-code" do
-  version "1.1.1"
+  version "1.2.0"
   sha256 :no_check
 
   url "file:///dev/null"
