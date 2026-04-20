@@ -296,7 +296,7 @@ class FullscriptClaudeCode
 end
 
 cask "fullscript-claude-code" do
-  version "1.3.0"
+  version "1.3.1"
   sha256 :no_check
 
   url "file:///dev/null"
@@ -305,7 +305,6 @@ cask "fullscript-claude-code" do
   desc "Claude Code with Fullscript AWS Bedrock configuration"
   homepage "https://www.anthropic.com/claude-code"
 
-  depends_on cask: "claude-code"
   depends_on formula: "awscli"
 
   postflight do
