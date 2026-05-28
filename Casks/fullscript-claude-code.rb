@@ -11,9 +11,9 @@ class FullscriptClaudeCode
   MIN_AWS_VERSION = "2.27.63"
   MODELS = {
     opus: {
-      suffix: "opus-4-7",
-      inference_profile: "global.anthropic.claude-opus-4-7",
-      name: "Opus 4.7",
+      suffix: "opus-4-8",
+      inference_profile: "global.anthropic.claude-opus-4-8",
+      name: "Opus 4.8",
     },
     sonnet: {
       suffix: "sonnet-4-6",
@@ -301,7 +301,7 @@ class FullscriptClaudeCode
 end
 
 cask "fullscript-claude-code" do
-  version "1.4.0"
+  version "1.5.0"
   sha256 :no_check
 
   url "file:///dev/null"
