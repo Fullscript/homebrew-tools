@@ -1,35 +1,71 @@
 # frozen_string_literal: true
-require 'json'
-require 'open3'
+
+require "json"
 
 class FullscriptClaudeCode
-  REGION = "us-east-1"
-  ENV_CONFIG_FILE = "#{HOMEBREW_PREFIX}/etc/fullscript-claude-code/env.sh"
-  USER_SETTINGS_FILE = File.expand_path("~/.claude/settings.json")
+  USER_SETTINGS_FILE = File.expand_path("~/.claude/settings.json").freeze
   RX_BIN = "/opt/fullscript/bin/rx"
-  AWS_BIN = "#{HOMEBREW_PREFIX}/bin/aws"
-  MIN_AWS_VERSION = "2.27.63"
-  MODELS = {
-    opus: {
-      suffix: "opus-4-8",
-      inference_profile: "global.anthropic.claude-opus-4-8",
-      name: "Opus 4.8",
-    },
-    sonnet: {
-      suffix: "sonnet-5",
-      inference_profile: "global.anthropic.claude-sonnet-5",
-      name: "Sonnet 5",
-    },
-    haiku: {
-      suffix: "haiku-4-5",
-      inference_profile: "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-      name: "Haiku 4.5",
-    },
-    fable: {
-      suffix: "fable-5",
-      inference_profile: "global.anthropic.claude-fable-5",
-      name: "Fable 5",
-    },
+
+  # Sentinel marking a key to be removed during the deep merge.
+  REMOVE = Object.new.freeze
+
+  DEFAULT_SETTINGS = {
+    "awsAuthRefresh"     => REMOVE,
+    "apiKeyHelper"       => "#{RX_BIN} gateway login",
+    "env"                => {
+      "ANTHROPIC_DEFAULT_FABLE_MODEL_NAME"         => "Fable 5",
+      "ANTHROPIC_DEFAULT_FABLE_MODEL"              => "global.anthropic.claude-fable-5",
+      "ANTHROPIC_DEFAULT_FABLE_MODEL_DESCRIPTION"  => "(Cloudflare gateway)",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL_NAME"          => "Opus 5",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL"               => "global.anthropic.claude-opus-5",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL_DESCRIPTION"   => "(Cloudflare gateway)",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME"        => "Sonnet 5",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL"             => "global.anthropic.claude-sonnet-5",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL_DESCRIPTION" => "(Cloudflare gateway)",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME"         => "Haiku 4.5",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL"              => "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL_DESCRIPTION"  => "(Cloudflare gateway)",
+      "AWS_REGION"                                 => REMOVE,
+      "CLAUDE_CODE_USE_BEDROCK"                    => "1",
+      "CLAUDE_CODE_SKIP_BEDROCK_AUTH"              => "1",
+      "ANTHROPIC_BEDROCK_BASE_URL"                 => "https://dev-ai-gateway.fullscript.cloud/p/bedrock/aws-bedrock/bedrock-runtime/us-east-1",
+      "CLAUDE_CODE_MAX_OUTPUT_TOKENS"              => "16384",
+      "MAX_THINKING_TOKENS"                        => "10000",
+    }.freeze,
+    "permissions"        => {
+      "allow" => [
+        "Bash(git status:*)",
+        "Bash(git diff:*)",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git branch:*)",
+        "Bash(git remote -v:*)",
+        "Bash(git remote show:*)",
+        "Bash(git remote get-url:*)",
+        "Bash(git fetch:*)",
+        "Bash(git ls-files:*)",
+        "Bash(git rev-parse:*)",
+        "Bash(git describe:*)",
+        "Bash(git config --get:*)",
+        "Bash(git config --list:*)",
+        "Bash(cd:*)",
+        "Bash(ls:*)",
+        "Bash(pwd)",
+        "Bash(which:*)",
+        "Bash(echo:*)",
+        "Bash(cat:*)",
+        "Bash(head:*)",
+        "Bash(tail:*)",
+        "Bash(wc:*)",
+        "Bash(grep:*)",
+        "Bash(rg:*)",
+        "Bash(find:*)",
+        "Bash(tree:*)",
+        "Bash(command:*)",
+        "Bash(file:*)",
+        "Bash(stat:*)",
+      ].freeze,
+    }.freeze,
   }.freeze
 
   def initialize(ohai)
@@ -42,12 +78,7 @@ class FullscriptClaudeCode
 
   def install
     check_rx_installed
-    check_aws_version
-    ensure_aws_authenticated
-    cleanup_stale_inference_profiles
-    create_all_inference_profiles
     install_user_settings
-    remove_legacy_env_config
   end
 
   private
@@ -63,278 +94,75 @@ class FullscriptClaudeCode
     ERROR
   end
 
-  def check_aws_version
-    stdout, _, status = Open3.capture3(AWS_BIN, "--version")
-    raise "Failed to get AWS CLI version" unless status.success?
-
-    version = stdout[/aws-cli\/(\d+\.\d+\.\d+)/, 1]
-    raise "Could not parse AWS CLI version from: #{stdout}" unless version
-
-    return if Gem::Version.new(version) >= Gem::Version.new(MIN_AWS_VERSION)
-
-    raise "AWS CLI #{MIN_AWS_VERSION}+ required, found #{version}. Run: brew upgrade awscli"
-  end
-
-  def gitlab_email
-    @gitlab_email ||= begin
-      stdout, stderr, status = Open3.capture3(RX_BIN, "config", "auth", "--json", "--type", "gitlab")
-      raise "Failed to get GitLab config from rx: #{stderr}" unless status.success?
-
-      data = JSON.parse(stdout)
-      email = data.dig("gitlab", "email")
-      raise "Could not determine GitLab email from rx config" unless email
-
-      email
-    end
-  end
-
-  def username
-    @username ||= gitlab_email.split("@").first
-  end
-
-  def username_slug
-    @username_slug ||= username.tr(".", "-")
-  end
-
-  def aws_authenticated?
-    _, _, status = Open3.capture3(AWS_BIN, "sts", "get-caller-identity", "--query", "Account", "--output", "text")
-    status.success?
-  end
-
-  def ensure_aws_authenticated
-    return if aws_authenticated?
-
-    ohai "AWS SSO authentication required"
-    _, stderr, status = Open3.capture3(RX_BIN, "sso", "login")
-    raise "Failed to authenticate with AWS SSO: #{stderr}" unless status.success?
-  end
-
-  def aws_account_id
-    @aws_account_id ||= begin
-      stdout, stderr, status = Open3.capture3(AWS_BIN, "sts", "get-caller-identity", "--query", "Account", "--output", "text")
-      raise "Failed to get AWS account ID: #{stderr}" unless status.success?
-
-      stdout.strip
-    end
-  end
-
-  def inference_profile_exists?(profile_name)
-    stdout, _, status = Open3.capture3(
-      AWS_BIN, "bedrock", "list-inference-profiles",
-      "--region", REGION,
-      "--type", "APPLICATION",
-      "--query", "inferenceProfileSummaries[?inferenceProfileName==`#{profile_name}`].inferenceProfileArn",
-      "--output", "text"
-    )
-    status.success? && !stdout.strip.empty?
-  end
-
-  def create_inference_profile(suffix, model_id)
-    profile_name = "#{username_slug}-#{suffix}-claude-code"
-
-    if inference_profile_exists?(profile_name)
-      ohai "Inference profile already exists: #{profile_name}"
-      return
-    end
-
-    ohai "Creating inference profile: #{profile_name}"
-    source_arn = "arn:aws:bedrock:#{REGION}:#{aws_account_id}:inference-profile/#{model_id}"
-
-    _, stderr, status = Open3.capture3(
-      AWS_BIN, "bedrock", "create-inference-profile",
-      "--inference-profile-name", profile_name,
-      "--model-source", "copyFrom=#{source_arn}",
-      "--tags",
-      "key=fullscript:environment,value=development",
-      "key=fullscript:team,value=engineering",
-      "key=fullscript:service,value=Bedrock",
-      "key=fullscript:user,value=#{username}",
-      "key=fullscript:tool,value=claude-code",
-      "--region", REGION
-    )
-    raise "Failed to create inference profile #{profile_name}: #{stderr}" unless status.success?
-  end
-
-  def create_all_inference_profiles
-    MODELS.each_value { |model| create_inference_profile(model[:suffix], model[:inference_profile]) }
-  end
-
-  def cleanup_stale_inference_profiles
-    stdout, stderr, status = Open3.capture3(
-      AWS_BIN, "bedrock", "list-inference-profiles",
-      "--region", REGION,
-      "--type", "APPLICATION",
-      "--query", "inferenceProfileSummaries[?starts_with(inferenceProfileName, '#{username_slug}-')].[inferenceProfileName,inferenceProfileArn]",
-      "--output", "text"
-    )
-    raise "Failed to list inference profiles: #{stderr}" unless status.success?
-
-    expected_names = MODELS.values.map { |model| "#{username_slug}-#{model[:suffix]}-claude-code" }
-
-    stdout.lines.each do |line|
-      name, arn = line.strip.split("\t")
-      next if expected_names.include?(name)
-
-      ohai "Deleting stale inference profile: #{name}"
-      _, del_stderr, del_status = Open3.capture3(
-        AWS_BIN, "bedrock", "delete-inference-profile",
-        "--inference-profile-identifier", arn,
-        "--region", REGION
-      )
-      raise "Failed to delete inference profile #{name}: #{del_stderr}" unless del_status.success?
-    end
-  end
-
-  def get_inference_profile_arns
-    stdout, stderr, status = Open3.capture3(
-      AWS_BIN, "bedrock", "list-inference-profiles",
-      "--region", REGION,
-      "--type", "APPLICATION",
-      "--query", "inferenceProfileSummaries[?contains(inferenceProfileName, '#{username_slug}') && contains(inferenceProfileName, '-claude-code')].[inferenceProfileName,inferenceProfileArn]",
-      "--output", "text"
-    )
-    raise "Failed to list inference profiles: #{stderr}" unless status.success?
-
-    arns = stdout.lines.each_with_object({}) do |line, result|
-      name, arn = line.strip.split("\t")
-      MODELS.each do |key, model|
-        result[key] = arn if name&.include?(model[:suffix])
-      end
-    end
-
-    missing = MODELS.keys - arns.keys
-    raise "Missing inference profiles: #{missing.join(', ')}" if missing.any?
-
-    arns
-  end
-
   def install_user_settings
     FileUtils.mkdir_p(File.dirname(USER_SETTINGS_FILE))
 
-    existing_content = read_settings_file
-    settings = begin
-      JSON.parse(existing_content)
-    rescue JSON::ParserError => e
-      raise "Cannot update #{USER_SETTINGS_FILE}: file contains invalid JSON (#{e.message}). Please fix or remove it and try again."
-    end
+    existing_settings = read_settings_file
+    new_settings = deep_merge(existing_settings, DEFAULT_SETTINGS)
 
-    apply_default_settings(settings, get_inference_profile_arns)
-    new_content = JSON.pretty_generate(settings)
-
-    if existing_content == new_content
+    if new_settings == existing_settings
       ohai "#{USER_SETTINGS_FILE} already up to date"
       return
     end
 
-    File.write(USER_SETTINGS_FILE, new_content)
+    File.write(USER_SETTINGS_FILE, JSON.pretty_generate(new_settings))
     ohai "Updated #{USER_SETTINGS_FILE}"
   end
 
-  def remove_legacy_env_config
-    return unless File.exist?(ENV_CONFIG_FILE)
-
-    FileUtils.rm(ENV_CONFIG_FILE)
-    ohai "Removed legacy env config: #{ENV_CONFIG_FILE}"
-  end
-
   def read_settings_file
-    File.read(USER_SETTINGS_FILE)
+    JSON.parse(File.read(USER_SETTINGS_FILE))
   rescue Errno::ENOENT
-    "{}"
+    {}
+  rescue JSON::ParserError => e
+    raise "Cannot update #{USER_SETTINGS_FILE}: file contains invalid JSON (#{e.message}). Please fix or remove it and try again."
   end
 
-  def apply_default_settings(settings, arns)
-    settings["autoUpdatesChannel"] ||= "stable"
-    settings["awsAuthRefresh"] = "#{RX_BIN} sso login"
+  # Deep merges +defaults+ into +base+, returning a new hash. Nested hashes
+  # are merged recursively, arrays are unioned, and any value equal to the
+  # REMOVE sentinel deletes the corresponding key.
+  def deep_merge(base, defaults)
+    result = base.dup
 
-    settings["env"] ||= {}
-    settings["env"].merge!(default_env(arns))
+    defaults.each do |key, default_value|
+      if default_value.equal?(REMOVE)
+        result.delete(key)
+        next
+      end
 
-    settings["permissions"] ||= {}
-    settings["permissions"]["allow"] ||= []
-    settings["permissions"]["allow"] |= default_permissions
-  end
-
-  def default_env(arns)
-    env = MODELS.each_with_object({}) do |(key, model), result|
-      prefix = "ANTHROPIC_DEFAULT_#{key.upcase}_MODEL"
-      result[prefix] = arns[key]
-      result["#{prefix}_NAME"] = model[:name]
-      result["#{prefix}_DESCRIPTION"] = "(bedrock #{arns[key].split('/').last})"
+      base_value = result[key]
+      result[key] = if default_value.is_a?(Hash)
+        deep_merge(base_value.is_a?(Hash) ? base_value : {}, default_value)
+      elsif base_value.is_a?(Array) && default_value.is_a?(Array)
+        base_value | default_value
+      else
+        default_value
+      end
     end
-    env["CLAUDE_CODE_USE_BEDROCK"] = "1"
-    env["AWS_REGION"] = REGION
-    env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = "16384"
-    env["MAX_THINKING_TOKENS"] = "10000"
-    env
-  end
 
-  def default_permissions
-    [
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(git show:*)",
-      "Bash(git branch:*)",
-      "Bash(git remote -v:*)",
-      "Bash(git remote show:*)",
-      "Bash(git remote get-url:*)",
-      "Bash(git fetch:*)",
-      "Bash(git ls-files:*)",
-      "Bash(git rev-parse:*)",
-      "Bash(git describe:*)",
-      "Bash(git config --get:*)",
-      "Bash(git config --list:*)",
-      "Bash(cd:*)",
-      "Bash(ls:*)",
-      "Bash(pwd)",
-      "Bash(which:*)",
-      "Bash(echo:*)",
-      "Bash(cat:*)",
-      "Bash(head:*)",
-      "Bash(tail:*)",
-      "Bash(wc:*)",
-      "Bash(grep:*)",
-      "Bash(rg:*)",
-      "Bash(find:*)",
-      "Bash(tree:*)",
-      "Bash(command:*)",
-      "Bash(file:*)",
-      "Bash(stat:*)",
-    ]
+    result
   end
 end
 
 cask "fullscript-claude-code" do
-  version "1.6.0"
+  version "2.0.0"
   sha256 :no_check
 
   url "file:///dev/null"
-
   name "Fullscript Claude Code Setup"
-  desc "Claude Code with Fullscript AWS Bedrock configuration"
+  desc "Claude Code with Cloudflare gateway configuration"
   homepage "https://www.anthropic.com/claude-code"
 
-  depends_on formula: "awscli"
-
-  postflight do
+  preflight do
     FullscriptClaudeCode.new(method(:ohai)).install
   end
 
   caveats <<~EOS
-    Fullscript Claude Code has been configured with AWS Bedrock!
+    Fullscript Claude Code has been configured with the Cloudflare gateway!
 
     To get started, run:
       claude
 
     Configuration file created:
     - #{FullscriptClaudeCode::USER_SETTINGS_FILE} (user settings)
-
-    If you need to re-authenticate with AWS, run:
-      #{FullscriptClaudeCode::RX_BIN} sso login
   EOS
-
-  uninstall_postflight do
-    FileUtils.rm(FullscriptClaudeCode::ENV_CONFIG_FILE) if File.exist?(FullscriptClaudeCode::ENV_CONFIG_FILE)
-  end
 end
