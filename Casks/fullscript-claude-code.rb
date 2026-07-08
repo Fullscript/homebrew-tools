@@ -16,14 +16,19 @@ class FullscriptClaudeCode
       name: "Opus 4.8",
     },
     sonnet: {
-      suffix: "sonnet-4-6",
-      inference_profile: "global.anthropic.claude-sonnet-4-6",
-      name: "Sonnet 4.6",
+      suffix: "sonnet-5",
+      inference_profile: "global.anthropic.claude-sonnet-5",
+      name: "Sonnet 5",
     },
     haiku: {
       suffix: "haiku-4-5",
       inference_profile: "global.anthropic.claude-haiku-4-5-20251001-v1:0",
       name: "Haiku 4.5",
+    },
+    fable: {
+      suffix: "fable-5",
+      inference_profile: "global.anthropic.claude-fable-5",
+      name: "Fable 5",
     },
   }.freeze
 
@@ -301,7 +306,7 @@ class FullscriptClaudeCode
 end
 
 cask "fullscript-claude-code" do
-  version "1.5.0"
+  version "1.6.0"
   sha256 :no_check
 
   url "file:///dev/null"
