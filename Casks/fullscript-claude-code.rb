@@ -9,7 +9,7 @@ cask "fullscript-claude-code" do
   desc "Retired: rx now manages Claude Code settings"
   homepage "https://www.anthropic.com/claude-code"
 
-  disable! date: "2099-12-31", because: "is replaced by rx"
+  disable! date: "2026-10-09", because: "is replaced by rx"
 
   stage_only true
 
